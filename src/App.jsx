@@ -604,6 +604,9 @@ ${pages.map((p,i) => `<div class="page"><div class="page-num">Page ${i+1} of ${p
           <p style={{ fontSize:"12px", color:"rgba(139,125,176,0.5)", margin:"10px 0 0", fontFamily:"'Quicksand',sans-serif" }}>
             Made with ✨ for every young storyteller
           </p>
+          <p style={{ fontSize:"12px", color:"rgba(139,125,176,0.5)", margin:"6px 0 0", fontFamily:"'Quicksand',sans-serif" }}>
+            Contact: <a href="mailto:Scribblemagicapp@gmail.com" style={{ color:BRAND.primaryLight, textDecoration:"none" }}>Scribblemagicapp@gmail.com</a>
+          </p>
         </div>
       </div>
     </div>
