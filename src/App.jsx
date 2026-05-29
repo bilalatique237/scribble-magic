@@ -349,22 +349,40 @@ export default function ScribbleMagic() {
     }
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
+    const shareData = {
+      title: storyData?.title || "Scribble Magic",
+      text: `✨ My child's handwritten story was turned into a magical storybook by Scribble Magic! Try it free at scribblemagicapp.com`,
+      url: "https://scribblemagicapp.com",
+    };
+    // Call navigator.share synchronously inside the gesture handler — required by iOS Safari
     if (navigator.share) {
-      try {
-        await navigator.share({ title: "Scribble Magic", text: `My child wrote a story and Scribble Magic turned it into a magical storybook! ✨`, url: window.location.href });
-        return;
-      } catch {}
+      navigator.share(shareData).catch(() => {});
+      return;
     }
-    try {
-      await navigator.clipboard.writeText(window.location.href);
+    // Fallback: copy to clipboard
+    navigator.clipboard.writeText("https://scribblemagicapp.com").then(() => {
       setShareToast(true);
       setTimeout(() => setShareToast(false), 3000);
-    } catch {}
+    }).catch(() => {});
   };
 
   const handleDownloadPDF = () => {
     const pages = storyData?.pages || [];
+
+    const pageHtml = pages.map((p, i) => {
+      const svg = illustrations[i];
+      const hasSvg = svg && svg !== "loading" && svg !== "error";
+      const imgTag = hasSvg
+        ? `<img class="page-img" src="data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}" alt="illustration" />`
+        : `<div class="page-img-placeholder">✨</div>`;
+      return `<div class="page">
+  <div class="page-num">Page ${i + 1} of ${pages.length}</div>
+  ${imgTag}
+  <div class="page-text">${p.text}</div>
+</div>`;
+    }).join("");
+
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${storyData?.title}</title>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Quicksand:wght@500;600&display=swap" rel="stylesheet">
@@ -372,26 +390,29 @@ export default function ScribbleMagic() {
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0D0B1A;font-family:'Quicksand',sans-serif;color:#F0EAFF}
 .cover{width:100vw;height:100vh;background:linear-gradient(145deg,#4e2da0,#6C3FD4,#9B72EF);display:flex;flex-direction:column;align-items:center;justify-content:center;page-break-after:always;text-align:center;padding:60px}
-.cover-emoji{font-size:90px;margin-bottom:28px;filter:drop-shadow(0 0 24px rgba(255,215,0,0.7))}
-.cover h1{font-family:'Baloo 2',cursive;font-size:52px;font-weight:800;color:white;margin-bottom:16px;text-shadow:0 2px 16px rgba(0,0,0,0.4);line-height:1.2}
+.cover-emoji{font-size:90px;margin-bottom:28px}
+.cover h1{font-family:'Baloo 2',cursive;font-size:52px;font-weight:800;color:white;margin-bottom:16px;line-height:1.2}
 .cover p{font-size:18px;color:rgba(255,255,255,0.6);font-style:italic}
 .cover .badge{margin-top:36px;border:2px solid rgba(255,215,0,0.5);border-radius:50px;padding:12px 36px;color:#FFD700;font-family:'Baloo 2',cursive;font-size:18px;font-weight:700}
-.page{width:100vw;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;page-break-after:always;background:#0D0B1A}
-.page-num{font-size:11px;color:#8B7DB0;text-transform:uppercase;letter-spacing:3px;margin-bottom:24px}
-.page-text{font-size:30px;line-height:1.9;text-align:center;color:#F0EAFF;background:#16122A;padding:40px 52px;border-radius:20px;border-left:5px solid #6C3FD4;max-width:760px;box-shadow:0 8px 40px rgba(108,63,212,0.2)}
+.page{width:100vw;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 80px;page-break-after:always;background:#0D0B1A;gap:32px}
+.page-num{font-size:11px;color:#8B7DB0;text-transform:uppercase;letter-spacing:3px}
+.page-img{width:100%;max-width:600px;height:300px;object-fit:cover;border-radius:20px;border:1px solid rgba(108,63,212,0.4)}
+.page-img-placeholder{width:100%;max-width:600px;height:300px;background:linear-gradient(135deg,#1a0533,#2d1b69);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:52px}
+.page-text{font-size:26px;line-height:1.9;text-align:center;color:#F0EAFF;background:#16122A;padding:36px 48px;border-radius:20px;border-left:5px solid #6C3FD4;max-width:700px}
 .end{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0D0B1A;text-align:center}
-.end h2{font-family:'Baloo 2',cursive;font-size:64px;font-weight:800;background:linear-gradient(135deg,#FFD700,#9B72EF,#FF6B9D);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.end h2{font-family:'Baloo 2',cursive;font-size:64px;font-weight:800;color:#FFD700}
 .end p{font-size:18px;color:#8B7DB0;margin-top:16px}
 .end .logo{font-family:'Baloo 2',cursive;font-size:22px;font-weight:800;color:#6C3FD4;margin-top:40px}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head>
 <body>
 <div class="cover">
   <div class="cover-emoji">🪄</div>
   <h1>${storyData?.title || "My Story"}</h1>
   <p>A Scribble Magic Original ✨</p>
-  <div class="badge">Scribble Magic</div>
+  <div class="badge">scribblemagicapp.com</div>
 </div>
-${pages.map((p,i) => `<div class="page"><div class="page-num">Page ${i+1} of ${pages.length}</div><div class="page-text">${p.text}</div></div>`).join("")}
+${pageHtml}
 <div class="end">
   <h2>The End ✨</h2>
   <p>A masterpiece by a brilliant young author ⭐</p>
@@ -401,7 +422,7 @@ ${pages.map((p,i) => `<div class="page"><div class="page-num">Page ${i+1} of ${p
     const win = window.open("", "_blank");
     win.document.write(html);
     win.document.close();
-    setTimeout(() => win.print(), 900);
+    setTimeout(() => win.print(), 1200);
   };
 
   const resetApp = () => {
