@@ -36,10 +36,12 @@ Respond ONLY with valid JSON, no markdown fences:
 }`;
 
 // ─── IMAGE COMPRESSION ────────────────────────────────────────────────────────
-function compressImage(dataUrl) {
-  return new Promise((resolve) => {
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
     const img = new Image();
+    const url = URL.createObjectURL(file);
     img.onload = () => {
+      URL.revokeObjectURL(url);
       const MAX = 1568;
       let { width, height } = img;
       if (width > MAX || height > MAX) {
@@ -52,7 +54,8 @@ function compressImage(dataUrl) {
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL("image/jpeg", 0.85).split(",")[1]);
     };
-    img.src = dataUrl;
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = url;
   });
 }
 
@@ -135,7 +138,7 @@ function StarField() {
     dur: Math.random() * 3 + 2,
   }));
   return (
-    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+    <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
       {stars.map(s => (
         <div key={s.id} style={{
           position: "absolute",
@@ -184,6 +187,7 @@ function IllustrationPanel({ svgContent, isLoading, pageIndex }) {
       borderRadius: "16px",
       width: "100%",
       aspectRatio: "4/3",
+      minHeight: "200px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -204,7 +208,7 @@ function IllustrationPanel({ svgContent, isLoading, pageIndex }) {
           <div style={{ fontSize: "52px" }}>🌟</div>
         </div>
       )}
-      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.3) 100%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, background: "radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.3) 100%)", pointerEvents: "none" }} />
     </div>
   );
 }
@@ -256,7 +260,7 @@ function BookCover({ title, onFlip }) {
         fontWeight:700,
         fontSize:"16px",
         letterSpacing:"1px",
-        backdropFilter:"blur(4px)",
+        backdropFilter:"blur(4px)", WebkitBackdropFilter:"blur(4px)",
       }}>Open the Book →</div>
     </div>
   );
@@ -286,16 +290,29 @@ export default function ScribbleMagic() {
 
   const handleFile = useCallback((file) => {
     if (!file || !file.type.startsWith("image/")) return;
+    setError(null);
+    setImageBase64(null);
+
+    // Show preview immediately
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setImage(e.target.result);
-      setError(null);
-      compressImage(e.target.result).then((base64) => {
+    reader.onload = (e) => setImage(e.target.result);
+    reader.readAsDataURL(file);
+
+    // Compress using object URL (memory-safe on iOS)
+    compressImage(file)
+      .then((base64) => {
         setImageBase64(base64);
         setImageMediaType("image/jpeg");
+      })
+      .catch(() => {
+        // Fallback: send original if compression fails
+        const fr = new FileReader();
+        fr.onload = (e) => {
+          setImageBase64(e.target.result.split(",")[1]);
+          setImageMediaType(file.type || "image/jpeg");
+        };
+        fr.readAsDataURL(file);
       });
-    };
-    reader.readAsDataURL(file);
   }, []);
 
   const makeStorybook = async () => {
@@ -447,7 +464,7 @@ ${pages.map((p,i) => `<div class="page"><div class="page-num">Page ${i+1} of ${p
           </div>
         )}
 
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"rgba(13,11,26,0.85)", backdropFilter:"blur(12px)", borderBottom:`1px solid rgba(108,63,212,0.2)`, padding:"14px 20px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, background:"rgba(13,11,26,0.85)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", borderBottom:`1px solid rgba(108,63,212,0.2)`, padding:"14px 20px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <button onClick={resetApp} style={{ background:"none", border:"none", color:BRAND.textMuted, fontSize:"13px", cursor:"pointer", fontFamily:"'Quicksand',sans-serif", fontWeight:600 }}>← New Story</button>
           <Logo size="sm" />
           <button onClick={handleShare} style={{ background:`linear-gradient(135deg,${BRAND.primary},${BRAND.primaryLight})`, border:"none", color:"white", borderRadius:"20px", padding:"8px 18px", fontSize:"13px", cursor:"pointer", fontFamily:"'Baloo 2',cursive", fontWeight:700 }}>
@@ -576,7 +593,7 @@ ${pages.map((p,i) => `<div class="page"><div class="page-num">Page ${i+1} of ${p
             marginBottom:"16px",
             animation:"fadeUp 0.5s ease 0.2s both",
           }}>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display:"none" }} onChange={e => handleFile(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={e => handleFile(e.target.files[0])} />
           {image ? (
             <div>
               <img src={image} alt="uploaded" style={{ maxHeight:"220px", maxWidth:"100%", borderRadius:"14px", boxShadow:`0 8px 32px rgba(0,0,0,0.4)`, border:`1px solid rgba(108,63,212,0.3)` }} />
@@ -600,21 +617,21 @@ ${pages.map((p,i) => `<div class="page"><div class="page-num">Page ${i+1} of ${p
         <button
           className="go-btn"
           onClick={makeStorybook}
-          disabled={!image}
+          disabled={!image || !imageBase64}
           style={{
             width:"100%", padding:"22px",
-            background: image ? `linear-gradient(135deg, ${BRAND.primary} 0%, ${BRAND.primaryLight} 50%, ${BRAND.accent} 100%)` : BRAND.bgCard,
-            backgroundSize: image ? "200% auto" : "auto",
-            color: image ? "white" : BRAND.textMuted,
+            background: (image && imageBase64) ? `linear-gradient(135deg, ${BRAND.primary} 0%, ${BRAND.primaryLight} 50%, ${BRAND.accent} 100%)` : BRAND.bgCard,
+            backgroundSize: (image && imageBase64) ? "200% auto" : "auto",
+            color: (image && imageBase64) ? "white" : BRAND.textMuted,
             border:"none", borderRadius:"18px",
             fontSize:"20px", fontFamily:"'Baloo 2',cursive", fontWeight:800,
-            cursor: image ? "pointer" : "not-allowed",
-            boxShadow: image ? `0 8px 32px rgba(108,63,212,0.45)` : "none",
+            cursor: (image && imageBase64) ? "pointer" : "not-allowed",
+            boxShadow: (image && imageBase64) ? `0 8px 32px rgba(108,63,212,0.45)` : "none",
             transition:"all 0.25s",
             letterSpacing:"0.5px",
-            animation: image ? "pulse 2s ease-in-out infinite, fadeUp 0.5s ease 0.3s both" : "fadeUp 0.5s ease 0.3s both",
+            animation: (image && imageBase64) ? "pulse 2s ease-in-out infinite, fadeUp 0.5s ease 0.3s both" : "fadeUp 0.5s ease 0.3s both",
           }}>
-          🪄 Create My Storybook!
+          {image && !imageBase64 ? "⏳ Processing image..." : "🪄 Create My Storybook!"}
         </button>
 
         <div style={{ textAlign:"center", marginTop:"36px", animation:"fadeUp 0.5s ease 0.4s both" }}>
